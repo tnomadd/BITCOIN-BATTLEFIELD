@@ -99,6 +99,8 @@
   .modal ul{padding-left:18px} .modal li{margin:3px 0}
   .modal .close{float:right}
   @media (max-width:1100px){#stats{width:230px}#feedBox,#depthBox{width:270px}.score{display:none}}
+  .brand{flex-shrink:0}
+  @media (max-width:1000px){.brand .t1,.brand .t2{display:none}}
   @media (max-width:800px){#stats,#feedBox,#depthBox,#hint{display:none}#venues{display:none}}
 </style>
 </head>
@@ -1333,7 +1335,7 @@ class Army {
     this.genSet = new HumanSet(gk, 5, [...gk.weapons, gk.shield]);
     this.gens = GEN_NAMES[side].map((name, k) => {
       const g = { gen: true, name, s: side, st: 'off', sc: 1.5, x: this.baseX, z: 0, vx: 0, vz: 0, ph: 0, atk: 0, cd: 1, hp: 7, hitT: 0, kx: 0, dt: 0, fall: 1, back: true, spd: 8, moving: false, yaw: this.yaw0, foe: null, fd: 99, rt: 0, vy: 0, ya: 0, hitDone: true, wa: 1.2, hold: 2, hz: 0, agg: 20, wt: bull ? 1 : 0, R: 2, atype: 0, blk: 0, circ: 0, circT: 0, bk: 0, sp: 0, kills: 0, gore: 0, hside: 1, dmode: 0, miss: 0, wallPrice: 0, wallUsd: 0, txt: '' };
-      g.lab = makeLabel(600, 90); g.lab.scale.set(11.5, 1.75, 1); g.lab.visible = false;
+      g.lab = makeLabel(600, 90); g.lab.scale.set(9.5, 1.45, 1); g.lab.visible = false;
       return g;
     });
     this.genLast = 0;
@@ -1539,7 +1541,7 @@ class Army {
   }
   // генерал: в 1,5 раза крупнее воина, привязан к одному крупному уровню стакана
   summonGeneral(g, c) {
-    Object.assign(g, { st: 'alive', x: this.baseX - this.dir * 2, z: rand(-14, 14), vx: 0, vz: 0, atk: 0, cd: .5, hp: 7, hitT: 0, kx: 0, dt: 0, yaw: this.yaw0, foe: null, fd: 99, rt: 0, hitDone: true, ya: 0, vy: 0, wa: 1.2,
+    Object.assign(g, { st: 'alive', x: this.baseX - this.dir * 2, z: rand(-14, 14), vx: 0, vz: 0, atk: 0, cd: .5, hp: 10, hitT: 0, kx: 0, dt: 0, yaw: this.yaw0, foe: null, fd: 99, rt: 0, hitDone: true, ya: 0, vy: 0, wa: 1.2,
       spd: 8, hold: rand(1, 4), hz: rand(-16, 16), agg: 20, blk: 0, bk: 0, circT: 0, kills: 0, miss: 0, wallPrice: c.price, wallUsd: c.usd, txt: '' });
     g.R = RANGE[this.side][g.wt] * 1.45;
     feed('⚔', `<b>${g.name}</b> joins the battle — ${this.side === 'bull' ? 'buy' : 'sell'} orders <b>${fmtUsd(c.usd)}</b> @ ${fmtP(c.price)}`, this.side);
@@ -1558,7 +1560,7 @@ class Army {
       }
       if (g.st === 'off') { this.genSet.hide(k); g.lab.visible = false; continue; }
       this.genSet.set(k, this.P, this.pose(g));
-      g.lab.visible = true; g.lab.position.set(g.x, 5 + g.ya, g.z);
+      g.lab.visible = g.st !== 'dead' || g.dt < 4; g.lab.position.set(g.x, 5 + g.ya, g.z);
       const txt = `⚔ ${g.name} · ${g.st === 'dead' ? 'FALLEN' : fmtUsd(g.wallUsd)}`;
       if (txt !== g.txt) { g.txt = txt; drawLabel(g.lab, txt, this.side === 'bull' ? '#d6e2ff' : '#f1d9a0', this.side === 'bull' ? '#3a5bbf' : '#9a7428', 'rgba(20,16,10,.82)'); }
     }
