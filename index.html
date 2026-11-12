@@ -1294,7 +1294,7 @@ class Army {
     this.nHead = (kit.heads || [0]).length; this.nTor = (kit.torsos || [0]).length;
     this.formT = 0; this.march = 0; this.banners = 0;
     // упавшее оружие и щиты на земле
-    this.drops = [kit.weapons[0], kit.weapons[1], kit.shield].map(g => { const m = new THREE.InstancedMesh(g, MATH, 90); m.frustumCulled = false; m.castShadow = true; for (let i = 0; i < 90; i++) m.setMatrixAt(i, ZM); scene.add(m); return m; });
+    this.drops = [kit.weapons[0], kit.weapons[1], kit.shield].map(g => { const m = new THREE.InstancedMesh(g, MATH, 90); m.frustumCulled = false; m.castShadow = true; for (let i = 0; i < 90; i++) { m.setMatrixAt(i, ZM); m.setColorAt(i, WHITE); } scene.add(m); return m; });
     this.dropPtr = [0, 0, 0];
     this.P = newPose();
     this.swordShare = bull ? .4 : .35;
