@@ -170,7 +170,8 @@
   <li><b>Cavalry</b> — order book depth on its side: riders charge into enemy infantry again and again. More Mongol horse archers appear as volatility rises.</li>
   <li><b>Archers</b> — shoot faster as volatility rises.</li>
   <li><b>Melee</b> — warriors duel one-on-one: a shield can block a blow, two wounds bring a man down. The fallen are replaced from the rear ranks.</li>
-  <li><b>King Leonidas / Genghis Khan</b> — appear when a large buy / sell wall shows up in the order book, and leave when it disappears.</li></ul>
+  <li><b>King Leonidas / Genghis Khan</b> — appear when a large buy / sell wall shows up in the order book, and leave when it disappears.</li>
+  <li><b>Generals</b> — up to 5 per side (Themistocles, Miltiades… / Subutai, Jebe…), one for each of the largest order levels on their side. They leave when their level is filled or pulled.</li></ul>
   <h4>Big events</h4>
   <ul><li>Trade over $100K — a volley of javelins (buy) or arrows (sell). Over $1M — a cavalry sortie as well.</li>
   <li>Long liquidations hit the Greeks, short liquidations hit the Mongols: under $50K — arrows, $50K+ — mounted raid, $150K+ — cavalry charge, $500K+ — a rain of fire arrows.</li></ul>
@@ -682,6 +683,25 @@ KIT.genghis = {
   uarm: recolor(KIT.bear.uarm, [[0xa8242f, BLUE]]), farm: recolor(KIT.bear.farm, [[0xa8242f, BLUE]]),
   head: mergeRaw([recolor(KIT.bear.head, [[0x8f98a2, GOLD], [0x4a3020, 0xeee8dc], [0x140d08, 0xcfcac0], [0x5a3a22, 0xeee8dc]]), merge([[CO(.065, .24, 8, .075, .02, 0, Math.PI, 0, 0), 0xcfcac0]])])
 };
+
+/* --- генералы: по 5 на сторону, по крупнейшим уровням стакана --- */
+const GBLUE = 0x2f4fa8, GBLACK = 0x1f1a17, GGOLD = 0x9a7428;
+KIT.genBull = {
+  ...KIT.bull, heads: null, torsos: null,
+  pelvis: recolor(KIT.bull.pelvis, [[0x2f8f50, GBLUE]]),
+  torso: mergeRaw([recolor(KIT.bull.torso, [[0xeae3d0, GBLUE]]), merge([[LA([[.25, -.6], [.24, -.25], [.21, .1], [.19, .3], [.16, .45]], 14, Math.PI * 1.1, Math.PI * .8), GBLUE]])]),   // синий плащ стратега
+  head: recolor(KIT.bull.head, [[0x2fbf62, 0xf2f0ea]]),   // белый гребень
+  uarm: recolor(KIT.bull.uarm, [[0xeae3d0, GBLUE]]),
+  shield: recolor(KIT.bull.shield, [[0x2fbf62, GBLUE]])
+};
+KIT.genBear = {
+  ...KIT.bear, heads: null, torsos: null,
+  pelvis: recolor(KIT.bear.pelvis, [[0xa8242f, GBLACK]]),
+  torso: recolor(KIT.bear.torso, [[0xa8242f, GBLACK], [0x5a4632, GGOLD], [0x4a3a2a, GGOLD]]),   // чёрный с золотом доспех
+  uarm: recolor(KIT.bear.uarm, [[0xa8242f, GBLACK]]), farm: recolor(KIT.bear.farm, [[0xa8242f, GBLACK]]),
+  head: recolor(KIT.bear.head, [[0x8f98a2, 0xb88a32]])
+};
+const GEN_NAMES = { bull: ['THEMISTOCLES', 'MILTIADES', 'PAUSANIAS', 'EPAMINONDAS', 'XENOPHON'], bear: ['SUBUTAI', 'JEBE', 'MUQALI', 'BATU KHAN', 'JOCHI'] };
 
 /* --- кинематика скелета: из позы — матрицы всех частей --- */
 const KM = { s: 1, sv: new THREE.Vector3(1, 1, 1), root: new THREE.Matrix4(), pel: new THREE.Matrix4(), tor: new THREE.Matrix4(), head: new THREE.Matrix4(), sh: [new THREE.Matrix4(), new THREE.Matrix4()], el: [new THREE.Matrix4(), new THREE.Matrix4()], hand: [new THREE.Matrix4(), new THREE.Matrix4()], th: [new THREE.Matrix4(), new THREE.Matrix4()], shn: [new THREE.Matrix4(), new THREE.Matrix4()], qT: new THREE.Quaternion(), qR: new THREE.Quaternion() };
@@ -1271,7 +1291,7 @@ const grid = new Map();
 const gcell = v => Math.floor(v / 3) + 200;
 function gridBuild() {
   grid.clear();
-  for (const s of ['bull', 'bear']) for (const u of [...armies[s].u, armies[s].hero]) if (u.st === 'alive') {
+  for (const s of ['bull', 'bear']) for (const u of [...armies[s].u, armies[s].hero, ...armies[s].gens]) if (u.st === 'alive') {
     const k = gcell(u.x) * 1000 + gcell(u.z); let l = grid.get(k); if (!l) grid.set(k, l = []); l.push(u);
   }
 }
@@ -1309,6 +1329,14 @@ class Army {
     this.arch = new HumanSet(kit, na, [GEO.bowH]); this.arProps = [[0, 'bow', 0]];
     const hk = KIT[bull ? 'leonidas' : 'genghis'];
     this.heroSet = new HumanSet(hk, 1, [...hk.weapons, hk.shield]);
+    const gk = KIT[bull ? 'genBull' : 'genBear'];
+    this.genSet = new HumanSet(gk, 5, [...gk.weapons, gk.shield]);
+    this.gens = GEN_NAMES[side].map((name, k) => {
+      const g = { gen: true, name, s: side, st: 'off', sc: 1.5, x: this.baseX, z: 0, vx: 0, vz: 0, ph: 0, atk: 0, cd: 1, hp: 7, hitT: 0, kx: 0, dt: 0, fall: 1, back: true, spd: 8, moving: false, yaw: this.yaw0, foe: null, fd: 99, rt: 0, vy: 0, ya: 0, hitDone: true, wa: 1.2, hold: 2, hz: 0, agg: 20, wt: bull ? 1 : 0, R: 2, atype: 0, blk: 0, circ: 0, circT: 0, bk: 0, sp: 0, kills: 0, gore: 0, hside: 1, dmode: 0, miss: 0, wallPrice: 0, wallUsd: 0, txt: '' };
+      g.lab = makeLabel(600, 90); g.lab.scale.set(11.5, 1.75, 1); g.lab.visible = false;
+      return g;
+    });
+    this.genLast = 0;
     this.hero = { hero: true, s: side, st: 'off', x: this.baseX, z: 0, vx: 0, vz: 0, ph: 0, atk: 0, cd: 1, hp: 14, hitT: 0, kx: 0, dt: 0, fall: 1, back: true, spd: 8, moving: false, yaw: this.yaw0, foe: null, fd: 99, rt: 0, vy: 0, ya: 0, hitDone: true, wa: 1.2, hold: 1, hz: 0, agg: 30, wt: 0, R: 3, atype: 0, blk: 0, circ: 0, circT: 0, bk: 0, sp: 0, kills: 0 };
     this.heroLab = makeLabel(600, 80); this.heroLab.scale.set(13, 1.75, 1); this.heroLab.visible = false; this.heroTxt = ''; this.heroWall = 0; this.heroBig = 0; this.heroGone = 0;
     this.ar = []; for (let i = 0; i < na; i++) this.ar.push({ x: this.baseX, z: rand(-10, 10), ph: Math.random() * 6, draw: 0, cd: rand(1, 4), yaw: this.yaw0, tgt: null, ox: rand(10, 18), oz: rand(-22, 22) });
@@ -1337,6 +1365,7 @@ class Army {
     if (!u.hero) { if (!u.banner) this.dropItem(u.wt, u); if (Math.random() < .7) this.dropItem(2, u); }
     u.vx = dirX * (fling ? rand(4, 8) * fling : rand(.8, 1.8)); u.vz = fling ? rand(-2, 2) * fling : 0; u.vy = fling ? rand(3, 6) * fling : 0; u.ya = 0;
     this.losses++;
+    if (u.gen) feed('⚔️', `General <b>${u.name}</b> has fallen after slaying ${u.kills} enemies!`, other(this.side));
     if (u.hero) { feed('⚔️', `<b>${this.side === 'bull' ? 'King Leonidas has fallen' : 'Genghis Khan has fallen'}</b> in battle after slaying ${u.kills} enemies!`, 'gold'); SFX.horn(other(this.side)); }
     bloodSpray(u.x, 1.3, u.z, dirX, fling ? 22 : 14); bloodPool(u.x + dirX * .8, u.z, rand(.7, 1.2));
     SFX.scream(u.x, u.z);
@@ -1344,7 +1373,7 @@ class Army {
   }
   damage(u, n, dirX, blockable = true, wk = 'sword') {
     if (!u || u.st !== 'alive') return 'miss';
-    if (blockable && Math.random() < (u.hero ? .55 : this.blockP)) {
+    if (blockable && Math.random() < (u.hero ? .55 : u.gen ? .45 : this.blockP)) {
       u.hitT = .12; u.kx = dirX * .25; u.blk = .35;
       if (u.atk <= 0) u.cd = Math.min(u.cd, rand(.05, .35));   // закрылся щитом — и сразу ответный удар
       if (wk !== 'arrow' && Math.random() < .35) {   // парировал оружием
@@ -1358,7 +1387,7 @@ class Army {
       return 'block';
     }
     u.hp -= n; u.hitT = .3; u.kx = dirX * .6; u.hside = Math.random() < .5 ? 1 : -1;
-    if (!u.hero && u.hp > 0) this.hs.tint(u.i, _tc.setRGB(u.tr, u.tg * .72, u.tb * .68));   // ранен — кровь на одежде
+    if (u.i != null && u.hp > 0) this.hs.tint(u.i, _tc.setRGB(u.tr, u.tg * .72, u.tb * .68));   // ранен — кровь на одежде
     wk === 'spear' ? SFX.stab(u.x, u.z) : wk === 'arrow' ? SFX.arrowHit(u.x, u.z, 'flesh') : SFX.slash(u.x, u.z);
     bloodSpray(u.x, 1.3, u.z, dirX, 7); if (Math.random() < .5) bloodPool(u.x, u.z, rand(.3, .5));
     if (u.hp <= 0) { this.kill(u, dirX); return 'kill'; }
@@ -1385,7 +1414,7 @@ class Army {
   think(u, dt, front, enemy) {
     u.rt -= dt;
     // боевой дух: раненые проигрывающей армии бегут
-    if (!u.hero && !u.banner && u.flee <= 0 && u.hp < this.maxHp && this.share < .38 && Math.random() < dt * .25) { u.flee = rand(2.5, 5); u.foe = null; }
+    if (!u.hero && !u.gen && !u.banner && u.flee <= 0 && u.hp < this.maxHp && this.share < .38 && Math.random() < dt * .25) { u.flee = rand(2.5, 5); u.foe = null; }
     if (u.flee > 0) u.flee -= dt;
     const agg = u.flee > 0 ? 0 : this.formT > 0 ? 2.5 : u.agg;
     if (u.rt <= 0 || (u.foe && u.foe.st !== 'alive')) {
@@ -1400,7 +1429,7 @@ class Army {
       const dx = u.foe.x - u.x, dz = u.foe.z - u.z, d = Math.hypot(dx, dz) || .01;
       tx = u.foe.x - dx / d * R * .85; tz = u.foe.z - dz / d * R * .85; u.fd = d;
     } else if (u.flee > 0) { tx = u.x - this.dir * 12; tz = u.z; u.fd = 99; }
-    else if (this.formT > 0 && !u.hero) {   // строй перед битвой: фаланга / монгольская линия
+    else if (this.formT > 0 && !u.hero && !u.gen) {   // строй перед битвой: фаланга / монгольская линия
       const k = u.born % 132, row = (k / 22) | 0, col = k % 22, bull = this.side === 'bull';
       tx = front - this.dir * (2.6 + row * (bull ? 1.2 : 1.6)); tz = (col - 10.5) * (bull ? 1.15 : 1.5); u.fd = 99;
     } else { tx = front - this.dir * u.hold; tz = u.hz; u.fd = 99; }
@@ -1470,6 +1499,7 @@ class Army {
     for (let i = 0; i < this.MAX; i++) { const u = this.u[i]; if (u.st === 'off') { this.hs.hide(i); continue; } const pr = this.pose(u); this.hs.set(i, this.P, pr, u.hv, u.tv); }
     this.hs.flush();
     this.updateHero(dt, front, enemy);
+    this.updateGenerals(dt, front, enemy);
     this.updateArchers(dt, enemy);
   }
   // герой: царь Леонид / Чингисхан — вдвое крупнее, бьёт насмерть и задевает соседей
@@ -1478,7 +1508,7 @@ class Army {
     if (h.st === 'alive' || h.st === 'retreat') return;
     Object.assign(h, { st: 'alive', x: this.baseX - this.dir * 2, z: rand(-6, 6), vx: 0, vz: 0, atk: 0, cd: .5, hp: 14, hitT: 0, kx: 0, dt: 0, yaw: this.yaw0, foe: null, fd: 99, rt: 0, hitDone: true, ya: 0, vy: 0, wa: 1.2,
       spd: 8.5, hold: 1, hz: rand(-8, 8), agg: 30, blk: 0, bk: 0, circT: 0, wt: 0, R: this.side === 'bull' ? 3.4 : 2.6, kills: 0, born: 0 });
-    this.heroWall = wall.usd;
+    this.heroWall = wall.usd; this.heroPrice = wall.price;
     const name = this.side === 'bull' ? 'King Leonidas' : 'Genghis Khan';
     feed('👑', `Large ${this.side === 'bull' ? 'buy' : 'sell'} order <b>${fmtUsd(wall.usd)}</b> @ ${fmtP(wall.price)} — <b>${name}</b> enters the battle!`, this.side);
     SFX.horn(this.side); SFX.gallop(this.front, 0, 2); SFX.battleCry(this.front, 0);
@@ -1507,10 +1537,37 @@ class Army {
     }
     this.heroSet.flush();
   }
+  // генерал: в 1,5 раза крупнее воина, привязан к одному крупному уровню стакана
+  summonGeneral(g, c) {
+    Object.assign(g, { st: 'alive', x: this.baseX - this.dir * 2, z: rand(-14, 14), vx: 0, vz: 0, atk: 0, cd: .5, hp: 7, hitT: 0, kx: 0, dt: 0, yaw: this.yaw0, foe: null, fd: 99, rt: 0, hitDone: true, ya: 0, vy: 0, wa: 1.2,
+      spd: 8, hold: rand(1, 4), hz: rand(-16, 16), agg: 20, blk: 0, bk: 0, circT: 0, kills: 0, miss: 0, wallPrice: c.price, wallUsd: c.usd, txt: '' });
+    g.R = RANGE[this.side][g.wt] * 1.45;
+    feed('⚔', `<b>${g.name}</b> joins the battle — ${this.side === 'bull' ? 'buy' : 'sell'} orders <b>${fmtUsd(c.usd)}</b> @ ${fmtP(c.price)}`, this.side);
+    SFX.horn(this.side);
+  }
+  updateGenerals(dt, front, enemy) {
+    for (let k = 0; k < this.gens.length; k++) {
+      const g = this.gens[k];
+      if (g.st === 'alive') this.think(g, dt, front, enemy);
+      else if (g.st === 'retreat') {
+        const dx = this.baseX - g.x, d = Math.abs(dx); g.x += Math.sign(dx) * Math.min(d, 7 * dt); g.ph += dt * 9; g.moving = true; g.sp = 7; g.foe = null; g.fd = 99;
+        g.yaw = angTo(g.yaw, this.yaw0 + Math.PI, Math.min(1, dt * 5)); if (d < 1) g.st = 'off';
+      } else if (g.st === 'dead') {
+        g.dt += dt; if (g.vy || g.ya > 0) { g.vy -= 18 * dt; g.ya += g.vy * dt; if (g.ya <= 0) { g.ya = 0; g.vy = 0; } }
+        const kk = Math.exp(-3 * dt); g.x += g.vx * dt; g.vx *= kk; if (g.dt > 25) g.st = 'off';
+      }
+      if (g.st === 'off') { this.genSet.hide(k); g.lab.visible = false; continue; }
+      this.genSet.set(k, this.P, this.pose(g));
+      g.lab.visible = true; g.lab.position.set(g.x, 5 + g.ya, g.z);
+      const txt = `⚔ ${g.name} · ${g.st === 'dead' ? 'FALLEN' : fmtUsd(g.wallUsd)}`;
+      if (txt !== g.txt) { g.txt = txt; drawLabel(g.lab, txt, this.side === 'bull' ? '#d6e2ff' : '#f1d9a0', this.side === 'bull' ? '#3a5bbf' : '#9a7428', 'rgba(20,16,10,.82)'); }
+    }
+    this.genSet.flush();
+  }
   // поза скелета одного воина: ноги, корпус, руки, оружие, щит
   pose(u) {
     const P = this.P, bull = this.side === 'bull';
-    P.scale = u.hero ? 2 : u.sc; P.look = 0;
+    P.scale = u.hero ? 2 : u.gen ? 1.5 : u.sc; P.look = 0;
     const prog = u.atk > 0 ? 1 - u.atk / ATK : 0, spear = bull && u.wt === 0;
     P.x = u.x; P.z = u.z; P.y = 0; P.yaw = u.yaw; P.fallA = 0; P.bob = 0; P.twist = 0; P.lean = 0; P.nod = 0; P.legAbd = 0;
     P.hip[0] = P.hip[1] = 0; P.knee[0] = P.knee[1] = .05; P.el[0] = P.el[1] = .2; P.wr[0] = P.wr[1] = 0;
@@ -1631,9 +1688,10 @@ function strike(A, E, u) {
     shake = Math.min(1, shake + .1); sparks(f.x, 1.6, f.z, 8);
     return;
   }
-  if (Math.random() < clamp(.32 + .35 * A.share, .2, .7)) {
-    const r = E.damage(f, 1, Math.sign(f.x - u.x) || A.dir, true, wk);
-    if (r === 'hit' || r === 'kill') { u.gore = Math.min(1, u.gore + (r === 'kill' ? .35 : .15)); A.hs.ptint(u.i, u.wt, _tc.copy(WHITE).lerp(GORE, u.gore)); }   // клинок в крови
+  if (Math.random() < clamp(.32 + .35 * A.share + (u.gen ? .2 : 0), .2, .85)) {
+    const r = E.damage(f, u.gen && !f.hero && !f.gen ? 2 : 1, Math.sign(f.x - u.x) || A.dir, true, wk);
+    if (r === 'kill' && u.gen) u.kills++;
+    if ((r === 'hit' || r === 'kill') && u.i != null) { u.gore = Math.min(1, u.gore + (r === 'kill' ? .35 : .15)); A.hs.ptint(u.i, u.wt, _tc.copy(WHITE).lerp(GORE, u.gore)); }   // клинок в крови
   }
 }
 const armies = { bull: new Army('bull'), bear: new Army('bear') };
@@ -2011,7 +2069,7 @@ function updateCamera(dt, front) {
   if (cam.cine) {   // кинокамера: облетает героев и самые жаркие схватки
     cam.spotT -= dt;
     if (cam.spotT <= 0 || !cam.tgt || cam.tgt.st === 'off') {
-      const hs = ['bull', 'bear'].map(s => armies[s].hero).filter(h => h.st === 'alive');
+      const hs = ['bull', 'bear'].flatMap(s => [armies[s].hero, ...armies[s].gens]).filter(h => h.st === 'alive');
       let t = hs.length && Math.random() < .7 ? pick(hs) : null;
       if (!t) { const busy = []; for (const s of ['bull', 'bear']) for (const u of armies[s].u) if (u.st === 'alive' && u.foe && u.fd < 3) busy.push(u); t = busy.length ? pick(busy) : null; }
       cam.tgt = t; cam.spotT = rand(6, 10);
@@ -2078,6 +2136,7 @@ setInterval(() => {
     armies.bear.target = clamp(Math.round(28 + 110 * (1 - p) * (.35 + .65 * M.activity)), 18, 150);
     const nb = M.bidDepth / M.maxDepth, na = M.askDepth / M.maxDepth;
     heroCheck('bull', M.buyWall, M.bidDepth); heroCheck('bear', M.sellWall, M.askDepth);
+    genCheck('bull'); genCheck('bear');
     armies.bull.share = p; armies.bear.share = 1 - p;
     armies.bull.rate = .5 + 1.4 * p * (.4 + .6 * M.activity); armies.bear.rate = .5 + 1.4 * (1 - p) * (.4 + .6 * M.activity);
     SFX.ambient(M.activity);
@@ -2095,6 +2154,29 @@ function updateSimBadge() {
       ? 'Looks like the page is open in an embedded preview where external connections are blocked. Download the file and open it in Chrome/Edge.'
       : 'Could not connect to Binance, Coinbase and Kraken — check your internet, VPN or firewall. We will switch back automatically once connected.')
     : 'Enabled manually. Choose «All exchanges» in the selector to return to the real price.';
+}
+// генералы: 5 крупнейших уровней заявок своей стороны (кроме стены героя)
+function genCheck(side) {
+  const A = armies[side], arr = side === 'bull' ? M.bid : M.ask; if (!arr || !arr.length || !round.center) return;
+  const NB = arr.length; let sum = 0; for (let i = 0; i < NB; i++) sum += arr[i];
+  const avg = sum / NB, cands = [];
+  for (let i = 0; i < NB; i++) {
+    if (arr[i] < Math.max(3e5, avg * 1.5)) continue;
+    const price = side === 'bull' ? M.price - (i + .5) * CFG.BUCK : M.price + (i + .5) * CFG.BUCK;
+    if (A.hero.st === 'alive' && Math.abs(price - (A.heroPrice || 0)) < 15) continue;
+    cands.push({ price, usd: arr[i], used: false });
+  }
+  cands.sort((a, b) => b.usd - a.usd); cands.length = Math.min(5, cands.length);
+  for (const g of A.gens) {
+    if (g.st !== 'alive') continue;
+    const c = cands.find(c => !c.used && Math.abs(c.price - g.wallPrice) < 15);
+    if (c) { c.used = true; g.wallPrice = c.price; g.wallUsd = c.usd; g.miss = 0; }
+    else if ((g.miss += .25) >= 8) { g.st = 'retreat'; g.foe = null; }
+  }
+  const now = performance.now();
+  if (now - A.genLast < 2500 || round.ending) return;
+  const c = cands.find(c => !c.used), g = A.gens.find(g => g.st === 'off');
+  if (c && g) { A.genLast = now; A.summonGeneral(g, c); }
 }
 // крупный ордер в стакане вызывает героя; ушла стена — герой уходит
 function heroCheck(side, w, depth) {
